@@ -12,7 +12,7 @@ Couldn't find any way to connect to it using ssh or telnet so the only way was t
 I'm not a Python programmer so this was made using sources from the internet, it's not pretty but it seems to work!
 
 Need to create a .env file with all the configurations needed:
-```json
+```yml
 # Router configuration
 ROUTER_IP="192.168.1.254"
 ROUTER_USERNAME="admin"  # CHANGE_ME
@@ -41,6 +41,6 @@ CHECK_INTERVAL = 300  # 5 minutes
 Then just run it with Python3
 
 ## TODO
-Accept parameters to choose method to get public ip
-Better error handling
-Cache IP to only update if it changed
+- Accept parameters to choose method to get public ip
+- Better error handling
+- Cache IP to only update if it changed
