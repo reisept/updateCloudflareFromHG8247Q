@@ -20,14 +20,14 @@ def send_telegram_message(message):
     """Send notification via Telegram bot"""
     if not os.getenv('TELEGRAM_BOT_TOKEN') or not os.getenv('TELEGRAM_CHAT_ID'):
         return False
-    
+
     url = f"https://api.telegram.org/bot{os.getenv('TELEGRAM_BOT_TOKEN')}/sendMessage"
     payload = {
         "chat_id": os.getenv('TELEGRAM_CHAT_ID'),
         "text": message,
         "parse_mode": "HTML"
     }
-    
+
     try:
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
@@ -36,7 +36,7 @@ def send_telegram_message(message):
             print(f"Telegram API error: {response.text}")
     except Exception as e:
         print(f"Error sending Telegram message: {e}")
-    
+
     return False
 
 def get_HG8247Q_wan_ip():
@@ -44,30 +44,30 @@ def get_HG8247Q_wan_ip():
     options.add_argument('--headless')  # Run in background
     options.add_argument('--disable-gpu')
     options.add_argument('--window-size=1920,1080')
-    
+
     driver = webdriver.Chrome(options=options)  # or webdriver.Firefox()
     driver.get(f"http://{os.getenv('ROUTER_IP')}{os.getenv('ROUTER_LOGIN_URL')}")
-    
+
     try:
         # Wait for page to load
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, 'txt_Username'))
         )
-        
+
         # Fill in credentials
         driver.find_element(By.ID, 'txt_Username').send_keys(os.getenv('ROUTER_USERNAME'))
         driver.find_element(By.ID, 'txt_Password').send_keys(os.getenv('ROUTER_PASSWORD'))
-        
+
         # Click login button
         driver.find_element(By.ID, 'loginbutton').click()
-        
+
         # Wait for login to complete
         time.sleep(3)
-        
+
         # Check if login was successful
         if 'index.asp' in driver.current_url:
             print("Login successful!")
-            
+
             # Get WAN IP on status page
             driver.get(f"http://{os.getenv('ROUTER_IP')}{os.getenv('ROUTER_STATUS_URL')}")
 
@@ -88,7 +88,7 @@ def get_HG8247Q_wan_ip():
             else:
                 print("Could not find public IP.")
                 return None
-            
+
     except Exception as e:
         print(f"Error during login: {e}")
         return None
@@ -105,7 +105,7 @@ def get_public_ip():
         error_msg = f"Error getting public IP: {e}"
         print(error_msg)
         send_telegram_message(f"⚠️ <b>DNS Updater Error</b>\n{error_msg}")
-    
+
     # Fallback to alternative services if the primary fails
     try:
         response = requests.get('https://ident.me', timeout=10)
@@ -115,7 +115,7 @@ def get_public_ip():
         error_msg = f"Error getting public IP from fallback service: {e}"
         print(error_msg)
         send_telegram_message(f"⚠️ <b>DNS Updater Error</b>\n{error_msg}")
-    
+
     return None
 
 def get_dns_record_id():
@@ -130,7 +130,7 @@ def get_dns_record_id():
         "name": os.getenv('DNS_RECORD_NAME'),
         "type": os.getenv('DNS_RECORD_TYPE')
     }
-    
+
     try:
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
@@ -145,7 +145,7 @@ def get_dns_record_id():
         error_msg = f"Error getting DNS record ID: {e}"
         print(error_msg)
         send_telegram_message(f"⚠️ <b>DNS Updater Error</b>\n{error_msg}")
-    
+
     return None
 
 def update_dns_record(new_ip, record_id):
@@ -160,10 +160,10 @@ def update_dns_record(new_ip, record_id):
         "type": os.getenv('DNS_RECORD_TYPE'),
         "name": os.getenv('DNS_RECORD_NAME'),
         "content": new_ip,
-        "ttl": os.getenv('TTL'),
+        "ttl": int(os.getenv('TTL')),
         "proxied": False  # Set to True if you use Cloudflare's proxy
     }
-    
+
     try:
         response = requests.put(url, headers=headers, data=json.dumps(data))
         if response.status_code == 200:
@@ -189,22 +189,22 @@ def update_dns_record(new_ip, record_id):
         error_msg = f"Error updating DNS record: {e}"
         print(error_msg)
         send_telegram_message(f"⚠️ <b>DNS Updater Error</b>\n{error_msg}")
-    
+
     return False
 
-def main():    
+def main():
     startup_msg = f"🚀 <b>Cloudflare DNS Updater Started</b>\n\n" \
                 f"<b>Domain:</b> {os.getenv('DNS_RECORD_NAME')}\n" \
                 f"<b>Check Interval:</b> Every {int(os.getenv('CHECK_INTERVAL'))//60} minutes\n" \
                 f"<b>Start Time:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    
+
     print(f"Starting Cloudflare DNS updater for {os.getenv('DNS_RECORD_NAME')}")
     print(f"Checking IP every {os.getenv('CHECK_INTERVAL')} seconds")
     send_telegram_message(startup_msg)
-    
+
     current_ip = None
     record_id = get_dns_record_id()
-    
+
     if not record_id:
         error_msg = f"❌ <b>DNS Updater Failed to Start</b>\n\n" \
                    f"Could not find DNS record for {os.getenv('DNS_RECORD_NAME')}.\n" \
@@ -212,13 +212,13 @@ def main():
         print(error_msg)
         send_telegram_message(error_msg)
         return
-    
+
     while True:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[{now}] Checking IP...")
-        
+
         new_ip = get_HG8247Q_wan_ip()
-        
+
         if new_ip and new_ip != current_ip:
             print(f"IP changed from {current_ip} to {new_ip}")
             if update_dns_record(new_ip, record_id):
@@ -227,7 +227,7 @@ def main():
             print("Could not determine public IP address")
         else:
             print(f"IP unchanged ({current_ip})")
-        
+
         time.sleep(int(os.getenv('CHECK_INTERVAL')))
 
 if __name__ == "__main__":
